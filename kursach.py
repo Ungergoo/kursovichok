@@ -63,6 +63,7 @@ def login():
 
 class ChessGame:
     def __init__(self, master):
+        
         self.game_over = False
         self.master = master
         self.master.title("Эндшпиль: Король и пешки")
@@ -80,12 +81,40 @@ class ChessGame:
         self.canvas.bind("<Button-1>", self.on_click)  # Обрабатываем клики мыши
 
     def init_board(self):
-        """Создаем шахматную доску и случайную расстановку фигур"""
+        """Создаем шахматную доску и добавляем координаты за ее пределами"""
+        cell_size = 50  # Размер клетки
+        board_size = 8 * cell_size  # Размер доски
+        offset = 20  # Отступ для координат
+
+        # Увеличиваем размер холста, чтобы вместить координаты
+        self.canvas.config(width=board_size + offset, height=board_size + offset)
+
         colors = ["white", "gray"]
         for row in range(8):
             for col in range(8):
                 color = colors[(row + col) % 2]
-                self.canvas.create_rectangle(col * 50, row * 50, (col + 1) * 50, (row + 1) * 50, fill=color)
+                self.canvas.create_rectangle(
+                    col * cell_size + offset, row * cell_size,
+                    (col + 1) * cell_size + offset, (row + 1) * cell_size,
+                    fill=color
+                )
+
+        # Добавляем координаты (цифры 1-8 слева)
+        for row in range(8):
+            self.canvas.create_text(
+                offset // 2, row * cell_size + cell_size // 2,
+                text=str(8 - row), font=("Arial", 14, "bold")
+            )
+
+        # Добавляем координаты (буквы A-H снизу)
+        for col in range(8):
+            self.canvas.create_text(
+                col * cell_size + offset + cell_size // 2, board_size + offset // 2,
+                text=chr(65 + col), font=("Arial", 14, "bold")
+            )
+
+
+
 
         # Генерируем случайные позиции для фигур
         positions = set()
@@ -124,20 +153,47 @@ class ChessGame:
 
 
     def draw_pieces(self):
-        """Рисуем фигуры на доске"""
+        """Рисуем фигуры на доске с использованием изображений"""
         self.canvas.delete("piece")  # Удаляем старые фигуры
+
+        # Загружаем изображения для фигур
+        self.images = {
+            "wK": tk.PhotoImage(file="w_king.png"),
+            "bK": tk.PhotoImage(file="b_king.png"),
+            "wQ": tk.PhotoImage(file="w_queen.png"),
+            "bQ": tk.PhotoImage(file="b_queen.png"),
+            "wP": tk.PhotoImage(file="w_pawn.png"),
+            "bP": tk.PhotoImage(file="b_pawn.png")
+        }
+
+        # Размер клетки на доске
+        cell_size = 50
+
         for row in range(8):
             for col in range(8):
                 piece = self.board[row][col]
                 if piece:
-                    # Определяем цвет фигуры
-                    if piece in ("P", "K", "Q"):  # Белые фигуры
-                        color = "blue"
-                    elif piece in ("p", "k", "q"):  # Черные фигуры
-                        color = "black"
-                    
-                    x, y = col * 50 + 25, row * 50 + 25
-                    self.canvas.create_text(x, y, text=piece, font=("Arial", 24), fill=color, tags="piece")
+                    # Определяем, какое изображение использовать в зависимости от фигуры
+                    if piece == "K":  # Белый король
+                        img = self.images["wK"]
+                    elif piece == "k":  # Черный король
+                        img = self.images["bK"]
+                    elif piece == "Q":  # Белый ферзь
+                        img = self.images["wQ"]
+                    elif piece == "q":  # Черный ферзь
+                        img = self.images["bQ"]
+                    elif piece == "P":  # Белая пешка
+                        img = self.images["wP"]
+                    elif piece == "p":  # Черная пешка
+                        img = self.images["bP"]
+
+                    # Вычисляем координаты для размещения изображения
+                    x, y = col * cell_size + 45, row * cell_size + 20
+
+                    # Размещаем изображение на доске
+                    self.canvas.create_image(x, y, image=img, tags="piece")
+
+
 
     def is_king_captured(self, player):
         """Проверяет, захвачен ли король указанного игрока"""
@@ -319,135 +375,225 @@ class ChessGame:
             return True
 
         return False
+    
+    def get_all_valid_moves(self, piece, row, col):
+        """Возвращает все допустимые ходы для данной фигуры"""
+        valid_moves = []
+        
+        for r in range(8):
+            for c in range(8):
+                if self.is_valid_move(piece, row, col, r, c):
+                    valid_moves.append((r, c))
+        
+        return valid_moves
+    def is_check(self, color):
+        """Проверяет, находится ли король на текущем цвете под шахом."""
+        king_pos = self.find_king(color)  # Находим положение короля
+        if not king_pos:
+            return False  # Если король не найден (ошибка, хотя быть не должно)
+
+        king_row, king_col = king_pos
+        for row in range(8):
+            for col in range(8):
+                piece = self.board[row][col]
+                if piece and piece.isupper() if color == 'black' else piece.islower():
+                    # Проверка, если фигура противника угрожает королю
+                    valid_moves = self.get_all_valid_moves(piece, row, col)
+                    for move in valid_moves:
+                        to_row, to_col = move
+                        if to_row == king_row and to_col == king_col:
+                            return True  # Если фигура может попасть на клетку с королем
+        return False
+    def find_king(self, color):
+        """Находит позицию короля на поле для данного цвета."""
+        for row in range(8):
+            for col in range(8):
+                piece = self.board[row][col]
+                if (piece == 'k' and color == 'black') or (piece == 'K' and color == 'white'):
+                    return row, col  # Возвращаем позицию короля
+        return None
+    def is_safe_move(self, row, col):
+        """Проверяет, безопасен ли ход на данную клетку для короля."""
+        if not (0 <= row < 8 and 0 <= col < 8):
+            return False  # Клетка вне поля
+
+        target_piece = self.board[row][col]
+        if target_piece and target_piece.islower():
+            return False  # Если на клетке своя фигура, то ход невозможен
+
+        # Проверяем, не будет ли эта клетка под атакой
+        for r in range(8):
+            for c in range(8):
+                piece = self.board[r][c]
+                if piece and piece.isupper():  # Вражеская фигура
+                    valid_moves = self.get_all_valid_moves(piece, r, c)
+                    for move in valid_moves:
+                        to_row, to_col = move
+                        if to_row == row and to_col == col:
+                            return False  # Клетка под атакой
+        return True
+    def king_escape(self):
+        """Логика ухода короля от шаха, проверяет, не окажется ли король под шахом после хода."""
+        king_pos = self.find_king('black')  # Найдем короля черных
+        if not king_pos:
+            return False  # Если король не найден, это ошибка
+
+        king_row, king_col = king_pos
+        # Перебираем все возможные клетки, куда может пойти король
+        possible_moves = [
+            (king_row - 1, king_col - 1), (king_row - 1, king_col), (king_row - 1, king_col + 1),
+            (king_row, king_col - 1),                       (king_row, king_col + 1),
+            (king_row + 1, king_col - 1), (king_row + 1, king_col), (king_row + 1, king_col + 1)
+        ]
+
+        # Пробуем найти безопасный ход
+        for row, col in possible_moves:
+            if self.is_safe_move(row, col):
+                # Пробуем временно переместить короля на новую клетку
+                self.move_piece((king_row, king_col), (row, col))
+                # После перемещения проверяем, не находится ли король снова под шахом
+                if not self.is_check('black'):  # Если король не под шахом, ход безопасен
+                    return True  # Ход сделан
+
+                # Если король всё равно под шахом, отменяем ход и пробуем следующую клетку
+                self.move_piece((row, col), (king_row, king_col))
+
+        # Если нет безопасных ходов, возвращаем False (нет возможного ухода)
+        return False
+    def is_checkmate(self, color):
+        """Проверяет, находится ли король под матом для указанного цвета."""
+        # Если король под шахом
+        if not self.is_check(color):
+            return False  # Если король не под шахом, нет мата
+
+        # Проверяем, может ли король уйти из шаха
+        if self.king_escape():
+            return False  # Если есть возможность уйти из шаха, значит мата нет
+
+        # Если нет безопасных ходов для короля, проверяем, можно ли предотвратить мат
+        return True
 
     def ai_move(self):
-        """ИИ делает ход, следуя приоритетам атаки и продвижения"""
-        if self.game_over:
-            return
+        """ИИ делает ход по приоритетам: рубка, ферзь, продвижение пешки, обычное движение и уход от шаха."""
+        ai_moves = []  # Для хранения обычных ходов
+        pawn_moves = []  # Для хранения ходов пешек
+        capture_moves = []  # Для хранения ходов, где есть возможность рубки
+        queen_moves = []  # Для хранения ходов ферзя
+        king_moves = []  # Для хранения ходов короля
 
-        # Список возможных ходов для каждой фигуры
-        attack_moves = []  # Ходы с атакой
-        promote_moves = []  # Ходы для продвижения пешек
-        king_attack_moves = []  # Ходы с атакой для короля
-        queen_attack_moves = []  # Ходы с атакой для ферзя
-        queen_moves = []  # Ходы для ферзя
-
-        # Ищем ходы для короля с рубкой (приоритетные ходы)
+        # Сначала ищем все ходы для фигур ИИ
         for row in range(8):
             for col in range(8):
                 piece = self.board[row][col]
-                if piece == "k":  # Черный король
-                    for dr in [-1, 0, 1]:
-                        for dc in [-1, 0, 1]:
-                            if 0 <= row + dr < 8 and 0 <= col + dc < 8:
-                                target = self.board[row + dr][col + dc]
-                                # Король может съесть фигуру противника (Пешка, Король или Ферзь)
-                                if target in ("P", "K", "Q", "p", "q"):  # Король может атаковать ферзя
-                                    king_attack_moves.append(((row, col), (row + dr, col + dc)))
+                if piece and piece.islower():  # Ищем фигуры черных (проверка на наличие фигуры)
+                    valid_moves = self.get_all_valid_moves(piece, row, col)
 
-        # Если есть ходы с атакой для короля, ИИ будет атаковать с королем (приоритет королю)
-        if king_attack_moves:
-            move = random.choice(king_attack_moves)
-            self.move_piece(move[0], move[1])
-            self.check_victory()  # Проверка на победу после хода
-            return
+                    for move in valid_moves:
+                        to_row, to_col = move
+                        target_piece = self.board[to_row][to_col]
 
-        # Ищем ходы для ферзя (если он есть)
-        for row in range(8):
-            for col in range(8):
-                piece = self.board[row][col]
-                if piece == "q":  # Черный ферзь
-                    for to_row in range(8):
-                        for to_col in range(8):
-                            if self.is_valid_move(piece, row, col, to_row, to_col):
-                                target = self.board[to_row][to_col]
-                                # Ферзь может атаковать или двигаться
-                                if target in ("P", "K", "Q", "p", "q"):  # Если фигура на целевой клетке противник
-                                    queen_attack_moves.append(((row, col), (to_row, to_col)))
-                                elif target is None:  # Если клетка пуста — обычный ход
-                                    queen_moves.append(((row, col), (to_row, to_col)))
+                        # 1. Если можно съесть фигуру
+                        if target_piece and target_piece.isupper():  # Белая фигура
+                            capture_moves.append((row, col, to_row, to_col, 3))  # Приоритет рубки
 
-        # Если есть ходы с атакой для ферзя, ИИ будет атаковать с ферзем
-        if queen_attack_moves:
-            move = random.choice(queen_attack_moves)
-            self.move_piece(move[0], move[1])
-            self.check_victory()  # Проверка на победу после хода
-            return
+                        # 2. Ход ферзя
+                        elif piece == "q":  # Ферзь
+                            queen_moves.append((row, col, to_row, to_col, 2))  # Приоритет хода ферзя
 
-        # Если ферзь может двигаться, но не атакует — ИИ будет двигаться ферзем
+                        # 3. Если это продвижение пешки (и пешка еще не достигла 7-й горизонтали)
+                        elif piece == "p" and to_row == 7:
+                            pawn_moves.append((row, col, to_row, to_col, 2))  # Приоритет продвижения пешки
+                        elif piece == "p" and to_row != 7 and not target_piece:
+                            # Если пешка не на 7-й горизонтали, но двигается вперед и не съедает
+                            pawn_moves.append((row, col, to_row, to_col, 1))  # Простой ход пешки
+
+                        # 4. Ход короля
+                        elif piece == "k":  # Король
+                            king_moves.append((row, col, to_row, to_col, 1))  # Приоритет хода короля
+
+                        # 5. Обычный ход
+                        elif not target_piece:
+                            ai_moves.append((row, col, to_row, to_col, 1))  # Обычное движение
+
+        # Сначала проверяем, под шахом ли король
+        if self.is_check('black'):  # Проверка, если черный король под шахом
+            print("Король под шахом! Ищем безопасный ход...")
+            # Попробуем уйти от шаха
+            if self.king_escape():  # Если удается уйти от шаха
+                return  # ИИ завершает ход после того, как король ушел от шаха
+
+        # Если рубка возможна, выполняем рубку
+        if capture_moves:
+            capture_moves.sort(key=lambda x: x[4], reverse=True)  # Сортируем по приоритету рубки
+            best_move = capture_moves[0]
+            from_row, from_col, to_row, to_col, _ = best_move
+            self.move_piece((from_row, from_col), (to_row, to_col))
+            return  # После рубки ИИ завершает ход
+
+        # Если рубки нет, проверяем, есть ли ходы для ферзя
         if queen_moves:
-            move = random.choice(queen_moves)
-            self.move_piece(move[0], move[1])
-            self.check_victory()  # Проверка на победу после хода
-            return
+            queen_moves.sort(key=lambda x: x[4], reverse=True)  # Сортируем по приоритету хода ферзя
+            best_move = queen_moves[0]
+            from_row, from_col, to_row, to_col, _ = best_move
+            self.move_piece((from_row, from_col), (to_row, to_col))
+            return  # После хода ферзя ИИ завершает ход
 
-        # Ищем ходы для атакующих пешек
+        # Если нет ферзя, проверяем ходы на продвижение пешки
+        if pawn_moves:
+            pawn_moves.sort(key=lambda x: x[4], reverse=True)  # Сортируем по приоритету продвижения
+            best_move = pawn_moves[0]
+            from_row, from_col, to_row, to_col, _ = best_move
+            self.move_piece((from_row, from_col), (to_row, to_col))
+            return  # После продвижения пешки ИИ завершает ход
+
+        # Если нет ни рубки, ни ферзя, ни пешки, выполняем ход королем
+        if king_moves:
+            king_moves.sort(key=lambda x: x[4], reverse=True)  # Сортируем по приоритету хода короля
+            best_move = king_moves[0]
+            from_row, from_col, to_row, to_col, _ = best_move
+            self.move_piece((from_row, from_col), (to_row, to_col))
+            return  # После хода королем ИИ завершает ход
+
+        # Если нет ни рубки, ни ферзя, ни короля, выполняем обычный ход
+        if ai_moves:
+            ai_moves.sort(key=lambda x: x[4], reverse=True)  # Сортируем по приоритету
+            best_move = ai_moves[0]
+            from_row, from_col, to_row, to_col, _ = best_move
+            self.move_piece((from_row, from_col), (to_row, to_col))
+
+
+
+    def is_king_in_check(self, color):
+        """Проверяет, находится ли король указанного цвета в шахе"""
+        king_position = None
         for row in range(8):
             for col in range(8):
                 piece = self.board[row][col]
-                if piece == "p":  # Черная пешка
-                    for to_row in range(8):
-                        for to_col in range(8):
-                            if self.is_valid_move(piece, row, col, to_row, to_col):
-                                target = self.board[to_row][to_col]
-                                if target in ("P", "K", "Q", "p", "q"):  # Если враг (пешка или король или ферзь)
-                                    attack_moves.append(((row, col), (to_row, to_col)))
+                if (color == "b" and piece == "k") or (color == "w" and piece == "K"):
+                    king_position = (row, col)
+                    break
 
-        # Если есть атакующие ходы для пешек
-        if attack_moves:
-            move = random.choice(attack_moves)
-            self.move_piece(move[0], move[1])
-            self.check_victory()  # Проверка на победу после хода
-            return
+        if not king_position:
+            return False  # Король не найден
 
-        # Если нет атакующих ходов, ищем ходы для продвижения пешек
+        # Проверяем, атакует ли фигура противника короля
+        opponent_color = "w" if color == "b" else "b"
         for row in range(8):
             for col in range(8):
-                if self.board[row][col] == "p":  # Черная пешка
-                    # Если пешка может двигаться вперед
-                    if row < 7 and self.board[row + 1][col] is None:
-                        promote_moves.append(((row, col), (row + 1, col)))
-                    # Пешка может бить по диагонали
-                    if col > 0 and row < 7 and self.board[row + 1][col - 1] in ("P", "K", "Q"):
-                        promote_moves.append(((row, col), (row + 1, col - 1)))
-                    if col < 7 and row < 7 and self.board[row + 1][col + 1] in ("P", "K", "Q"):
-                        promote_moves.append(((row, col), (row + 1, col + 1)))
+                piece = self.board[row][col]
+                if piece and piece.islower() if opponent_color == "b" else piece.isupper():
+                    # Проверяем, атакует ли фигура противника короля
+                    valid_moves = self.get_all_valid_moves(piece, row, col)
+                    if king_position in valid_moves:
+                        return True  # Король в шахе
 
-        # Если есть ходы для продвижения пешек, ИИ продвигает одну пешку
-        if promote_moves:
-            move = random.choice(promote_moves)
-            self.move_piece(move[0], move[1])
-            self.check_victory()  # Проверка на победу после хода
-            return
+        return False
 
-        # Когда нет атакующих ходов и ходов для продвижения пешек, ИИ ищет ход для короля
-        for row in range(8):
-            for col in range(8):
-                if self.board[row][col] == "k":  # Черный король
-                    possible_moves = []
-                    # Пробуем все 8 возможных направлений для короля
-                    for dr in [-1, 0, 1]:
-                        for dc in [-1, 0, 1]:
-                            if 0 <= row + dr < 8 and 0 <= col + dc < 8:
-                                target = self.board[row + dr][col + dc]
-                                # Если клетка пуста или противник — ходим
-                                if target is None or target in ("P", "K", "Q", "p", "q"):
-                                    possible_moves.append(((row, col), (row + dr, col + dc)))
-
-                    # Если есть возможные ходы для короля, делаем случайный ход
-                    if possible_moves:
-                        move = random.choice(possible_moves)
-                        self.move_piece(move[0], move[1])
-                        self.check_victory()  # Проверка на победу после хода
-                        return
-
-
-
-
-
-
-
-
+    def can_defend_king(self, from_row, from_col, to_row, to_col):
+        """Проверяет, может ли ход защитить короля"""
+        # Проверка для защиты короля, например, путем блокировки или перемещения короля
+        # Здесь может быть сложная логика в зависимости от того, как именно игра защищается от атак
+        return False  # Это просто пример; в реальной игре тут будет сложная логика
 
 
 
