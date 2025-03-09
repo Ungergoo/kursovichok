@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import messagebox
-import hashlib
 import json
 import os
 import random
@@ -8,6 +7,8 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 import base64
+
+
 
 # ===================== Функции работы с пользователями =====================
 KEY_FILE = "encryption_key.key"  # Файл для хранения ключа шифрования
@@ -152,6 +153,8 @@ class ChessGame:
 
         self.canvas.bind("<Button-1>", self.on_click)
 
+
+
     def init_board(self):
         """Создаем шахматную доску и добавляем координаты"""
         cell_size = 50  # Размер клетки
@@ -244,7 +247,11 @@ class ChessGame:
         self.board[self.wp2_pos[0]][self.wp2_pos[1]] = "P"
         self.board[self.bk_pos[0]][self.bk_pos[1]] = "k"
         self.board[self.bp_pos[0]][self.bp_pos[1]] = "p"
+
         self.draw_pieces()
+
+
+
 
     def draw_pieces(self):
         """Рисуем фигуры на доске с использованием изображений"""
@@ -283,7 +290,10 @@ class ChessGame:
                         x = col * cell_size + cell_size // 2
                         y = row * cell_size + cell_size // 2
                         self.canvas.create_image(x, y, image=img, tags="piece")
-                        
+
+
+
+
     def is_king_captured(self, player):
         """Проверяет, захвачен ли король указанного игрока"""
         if player == 1:  
@@ -337,6 +347,10 @@ class ChessGame:
         elif clicked_piece and clicked_piece.isupper():  
             self.selected_piece = (row, col)
 
+
+
+
+    
     def move_piece(self, from_pos, to_pos):
         """Перемещает фигуру и сразу проверяет победу"""
         from_row, from_col = from_pos
@@ -354,6 +368,10 @@ class ChessGame:
 
             if self.check_victory():
                 return
+
+
+
+
 
     def is_valid_move(self, piece, from_row, from_col, to_row, to_col):
         """Проверяет, допустим ли ход"""
@@ -382,6 +400,9 @@ class ChessGame:
 
             if abs(from_col - to_col) == 1 and to_row - from_row == 1 and target_piece and target_piece.isupper():
                 return True  
+
+
+
         # Ферзь – ходит как король, но по вертикали, горизонтали и диагоналям на любое количество клеток
         if piece in ("Q", "q"):
             if from_row == to_row:  
@@ -406,7 +427,10 @@ class ChessGame:
                 return True
 
         return False
-        
+
+
+
+    
     def reset_game(self):
         """Сбрасывает игру, создавая новую доску"""
         self.board = [[None for _ in range(8)] for _ in range(8)]  
@@ -481,6 +505,7 @@ class ChessGame:
                     return row, col  
         return None
 
+
     def is_safe_move(self, row, col):
         """Проверяет, безопасен ли ход на данную клетку для короля, включая атаки со стороны вражеских фигур."""
         if not (0 <= row < 8 and 0 <= col < 8):
@@ -495,6 +520,7 @@ class ChessGame:
 
         return True
 
+
     def is_under_attack(self, row, col):
         """Проверяет, атакует ли клетку вражеская фигура."""
         for r in range(8):
@@ -507,6 +533,7 @@ class ChessGame:
                         if to_row == row and to_col == col:
                             return True  
         return False
+
 
     def king_escape(self):
         """Логика ухода короля от шаха, проверяет, не окажется ли король под шахом после хода и не подставится ли он под рубку от вражеских фигур."""
@@ -596,6 +623,8 @@ class ChessGame:
             if self.king_escape():  
                 return 
 
+        
+
         king_under_check = self.is_check('black')  
 
         # Перебираем все фигуры ИИ
@@ -642,6 +671,9 @@ class ChessGame:
                         elif not target_piece:
                             ai_moves.append((row, col, to_row, to_col, 1))
 
+
+
+
         # Если можно рубить фигуру, делаем это
         if capture_moves:
             capture_moves.sort(key=lambda x: x[4], reverse=True)
@@ -675,6 +707,8 @@ class ChessGame:
             ai_moves.sort(key=lambda x: x[4], reverse=True)
             from_row, from_col, to_row, to_col, _ = ai_moves[0]
             self.move_piece((from_row, from_col), (to_row, to_col))
+        
+
 
     def is_king_in_check(self, color):
         """Проверяет, находится ли король указанного цвета в шахе"""
